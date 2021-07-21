@@ -18,7 +18,7 @@ Schedule daily tweets from markdown files in your source controlled repository.
 
 ## Configuration
 1. By default, posts tweets around 7:02AM PT (2:02 UTC). To change the time of day tweets are posted:
-  Set the `cron` section of `.github/workflows/go.yml` to the time you want the tweet to post (note: it will not run exactly at this time) https://cron.help/
+  Set the `cron` section of `.github/workflows/go.yml` to the time you want the tweet to post  https://cron.help/
 
 2. Changing the tweet directory:
    Change the `FILE_PATH` environment variable in `.github/workflows/go.yml` 
@@ -33,5 +33,5 @@ Schedule daily tweets from markdown files in your source controlled repository.
 ## Notes
 1. Fails silently on bad credentials, make sure you set those correctly.
 2. Only allows one tweet per day by design. If requested, this can be modified to allow tweets by the minute or hour. 
-3. I suggest moving posted tweets to a `posted/` subdirectory under `tweets/`, but it's completely optional.
-
+3. I suggest moving posted tweets to a `posted/` subdirectory under `tweets/`.
+4. Tweets will not be posted exactly at the cron time set in `go.yml` because of how github actions work. If you need posts to the minute, run locally on a cron.
