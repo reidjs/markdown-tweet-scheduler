@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/coreos/pkg/flagutil"
@@ -71,7 +72,7 @@ func ReadFile(file_name string) string {
 	return string(b)
 }
 
-func main() {
+func ScheduledTweet() {
 	LoadDotEnv()
 	current_time := time.Now()
 	formatted_time := current_time.Format("2006-Jan-02")
@@ -82,4 +83,30 @@ func main() {
 	content := ReadFile(todays_file_name)
 
 	Tweet(content)
+}
+
+func QueuedTweet() {
+	LoadDotEnv()
+	path := os.Getenv("FILE_PATH")
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	filenames := []string{}
+
+	for _, f := range files {
+		fmt.Println(f.Name())
+		filenames = append(filenames, f.Name())
+	}
+
+	sort.Strings(filenames)
+
+	fmt.Println(filenames)
+	// TODO: filter for names that fit the format
+	// TODO: tweet the content of the first file in the filtered list
+}
+
+func main() {
+	// ScheduledTweet()
+	QueuedTweet()
 }

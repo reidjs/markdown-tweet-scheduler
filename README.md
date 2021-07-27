@@ -1,3 +1,8 @@
+Queue system:
+Name files with q###.md (q1.md, q3.md, q10.md) and whichever is lowest is posted first gets posted
+- what if there's a scheduled one? post both? run at different time?  
+	- for now, just post both at the same time. in the future, we should support frontmatter to set a time of day
+
 # markdown-tweet-scheduler
 Schedule daily tweets from markdown files in your repo, posted to twitter via github actions. 
 
