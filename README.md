@@ -1,3 +1,8 @@
+Tests to write:
+1. if no scheduled tweets, posts a queued tweet
+2. if no queued tweets, fails gracefully
+5. check renaming (posted, failed, attempted)
+
 Queue system:
 Name files with q###.md (q1.md, q3.md, q10.md) and whichever is lowest is posted first gets posted
 - what if there's a scheduled one? post both? run at different time?  
