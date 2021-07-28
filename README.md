@@ -1,5 +1,5 @@
 # markdown-tweet-scheduler
-Schedule daily tweets from markdown files in your source controlled repository. 
+Schedule daily tweets from markdown files in your repo, posted to twitter via github actions. 
 
 ## Setup 
 1. Fork this repo
