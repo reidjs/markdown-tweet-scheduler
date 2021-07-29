@@ -1,13 +1,3 @@
-Tests to write:
-1. if no scheduled tweets, posts a queued tweet
-2. if no queued tweets, fails gracefully
-5. check renaming (posted, failed, attempted)
-
-Queue system:
-Name files with q###.md (q1.md, q3.md, q10.md) and whichever is lowest is posted first gets posted
-- what if there's a scheduled one? post both? run at different time?  
-	- for now, just post both at the same time. in the future, we should support frontmatter to set a time of day
-
 # markdown-tweet-scheduler
 Schedule daily tweets from markdown files in your repo, posted to twitter via github actions. 
 
@@ -19,8 +9,18 @@ Schedule daily tweets from markdown files in your repo, posted to twitter via gi
    - API_SECRET_KEY (known as consumer_secret in twitter API)
    - ACCESS_TOKEN
    - ACCESS_TOKEN_SECRET
-4. Create a markdown file in the `./tweets/` folder with tomorrow's date in `YYYY-Mon-DD` format, for example, `2021-Sep-05.md`, and write the content of your tweet in it.
-5. Commit the markdown file and it should post on the date specified in the filename. 
+
+## Scheduling Tweets
+**By Queue**
+1. Create a markdown file in the `./tweets/` folder with a name starting with `q-` for example, `q-1.md` or `q-84.md`
+2. Commit the file(s) and push to the remote repo. When the daily action runs, the first queued tweet in alphanumeric order should be posted. 
+
+**By Date**
+1. Create a markdown file in the `./tweets/` folder with tomorrow's date in `YYYY-Mon-DD` format, for example, `2021-Sep-05.md`, and write the content of your tweet in it.
+2. Commit the file(s) and push to the remote repo. When the daily action runs on the specified date, the tweet should be posted.
+
+**Both**
+If you have both date specified and queue specified posts in the `tweets` folder, date specified tweets will take precedence. I.e., the queued tweet(s) will wait until the next day in which there isn't a date specified tweet to post. Only one tweet may be posted by day, by design. 
 
 ## Why
 - View, edit, and post your tweets without logging into twitter manually

@@ -79,6 +79,9 @@ func ReadFile(file_name string) (string, error) {
 	return string(b), nil
 }
 
+// TODO: this is hard to test, should be refactored
+// GetFilenameFromDate(date) string
+// ReadTodaysFilename(string) string
 func ScheduledTweet() (string, string, error) {
 	LoadDotEnv()
 	current_time := time.Now()
@@ -96,6 +99,7 @@ func ScheduledTweet() (string, string, error) {
 }
 
 func IsQueueNameFormat(filename string) bool {
+	// if name fits the format q-#, return true
 	if string(filename[0]) == "q" && string(filename[1]) == "-" {
 		return true
 	}
@@ -112,8 +116,6 @@ func QueuedTweet() (string, string, error) {
 	filenames := []string{}
 
 	for _, f := range files {
-		// fmt.Println(f.Name())
-		// if name fits the format q-#, append it
 		if IsQueueNameFormat(f.Name()) {
 			filenames = append(filenames, f.Name())
 		}
@@ -158,22 +160,25 @@ func main() {
 			fmt.Println("Posting", queued_content)
 			post_failure := Tweet(queued_content)
 			if post_failure != nil {
-				fmt.Println("todo: change filename to failed_", queued_tweet_filename)
 				// TODO: check if this is correct naming
-				os.Rename(path+queued_tweet_filename, path+"failed_"+queued_tweet_filename[9:])
+				rename_err := os.Rename(queued_tweet_filename, path+"failed_"+queued_tweet_filename[19:])
+				fmt.Println(rename_err)
 			} else {
 				// TODO
-				fmt.Println("todo: change filename to posted_", queued_tweet_filename)
+				rename_err := os.Rename(queued_tweet_filename, path+"posted_"+queued_tweet_filename[19:])
+				fmt.Println(rename_err)
 			}
 		}
 	} else {
+		// try to post a scheduled tweet
 		post_failure := Tweet(scheduled_content)
 		if post_failure != nil {
-			// TODO
-			fmt.Println("todo: change filename to failed_", scheduled_tweet_filename)
+			rename_err := os.Rename(scheduled_tweet_filename, path+"failed_"+scheduled_tweet_filename[9:])
+			fmt.Println(rename_err)
 		} else {
-			// TODO
-			fmt.Println("todo: change filename to posted_", scheduled_tweet_filename)
+			// fmt.Println("todo: change filename to posted_", scheduled_tweet_filename)
+			rename_err := os.Rename(scheduled_tweet_filename, path+"posted_"+scheduled_tweet_filename[9:])
+			fmt.Println(rename_err)
 		}
 	}
 }
