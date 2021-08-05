@@ -20,7 +20,7 @@ Schedule daily tweets from markdown files in your repo, posted to twitter via gi
 2. Commit the file(s) and push to the remote repo. When the daily action runs on the specified date, the tweet should be posted.
 
 **Both**
-If you have both date specified and queue specified posts in the `tweets` folder, date specified tweets will take precedence. I.e., the queued tweet(s) will wait until the next day in which there isn't a date specified tweet to post. Only one tweet may be posted by day, by design. 
+1. If you have both date specified and queue specified posts in the `tweets` folder, date specified tweets will take precedence. I.e., the queued tweet(s) will wait until the next day in which there isn't a date specified tweet to post. Only one tweet may be posted by day, by design. 
 
 ## Why
 - View, edit, and post your tweets without logging into twitter manually
