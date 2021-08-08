@@ -8,7 +8,7 @@ Schedule daily tweets from markdown files in your repo, posted to twitter via gi
 
 ## Setup 
 1. Fork this repo
-2. Get your twitter credentials (https://developer.twitter.com/en)
+2. Get your twitter credentials by creating an app (https://developer.twitter.com/apps)
 3. Add your twitter credentials to the repository's secrets (https://docs.github.com/en/actions/reference/encrypted-secrets)
    - API_KEY (known as consumer_key in twitter API)
    - API_SECRET_KEY (known as consumer_secret in twitter API)
@@ -17,7 +17,7 @@ Schedule daily tweets from markdown files in your repo, posted to twitter via gi
 
 ## Scheduling Tweets
 **By Date**. 
-1. Create a markdown file in the `./tweets/` folder with tomorrow's date in `YYYY-Mon-DD` format, for example, `2021-Sep-05.md`, and write the content of your tweet in it.
+1. Create a markdown file in the `./tweets/` folder with a future date in `YYYY-Mon-DD` format, for example, `2021-Sep-05.md`, and write the content of your tweet in it.
 2. Commit the file(s) and push to the remote repo. When the daily action runs on the specified date, the tweet should be posted.
 
 
