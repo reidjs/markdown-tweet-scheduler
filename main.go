@@ -88,16 +88,26 @@ func ScheduledTweet() (string, string, error) {
 	formatted_time := current_time.Format("2006-Jan-02")
 	path := os.Getenv("FILE_PATH")
 	fmt.Println(path)
+
 	todays_file_name := path + formatted_time + ".md"
-	fmt.Println(todays_file_name)
 	content, err := ReadFile(todays_file_name)
-	if err != nil {
-		return "", "", err
+	// Fixes issue #3: Allow different date format
+	formatted_time2 := current_time.Format("January 2, 2006")
+	todays_file_name2 := path + formatted_time2 + ".md"
+	content2, err2 := ReadFile(todays_file_name2)
+
+	if err == nil {
+		fmt.Println("Attempting to post content from: ", todays_file_name)
+		return content, todays_file_name, nil
+	} else if err2 == nil {
+		fmt.Println("Attempting to post content from: ", todays_file_name2)
+		return content2, todays_file_name2, nil
 	}
 
-	return content, todays_file_name, nil
+	return "", "", errors.New(err.Error() + err2.Error())
 }
 
+// TODO: either fix or remove queue system:
 func IsQueueNameFormat(filename string) bool {
 	// if name fits the format q-#, return true
 	if string(filename[0]) == "q" && string(filename[1]) == "-" {
@@ -106,6 +116,7 @@ func IsQueueNameFormat(filename string) bool {
 	return false
 }
 
+// TODO: either fix or remove queue system:
 func QueuedTweet() (string, string, error) {
 	LoadDotEnv()
 	path := os.Getenv("FILE_PATH")
@@ -148,37 +159,10 @@ func QueuedTweet() (string, string, error) {
 
 func main() {
 	scheduled_content, scheduled_tweet_filename, scheduled_tweet_error := ScheduledTweet()
-	path := os.Getenv("FILE_PATH")
-
 	if scheduled_tweet_error != nil {
-		fmt.Println(scheduled_tweet_error)
-		// If there's not a scheduled tweet today, then try a queued tweet
-		queued_content, queued_tweet_filename, queued_tweet_error := QueuedTweet()
-		if queued_tweet_error != nil {
-			fmt.Println(queued_tweet_error)
-		} else {
-			fmt.Println("Posting", queued_content)
-			post_failure := Tweet(queued_content)
-			if post_failure != nil {
-				// TODO: check if this is correct naming
-				rename_err := os.Rename(queued_tweet_filename, path+"failed_"+queued_tweet_filename[19:])
-				fmt.Println(rename_err)
-			} else {
-				// TODO
-				rename_err := os.Rename(queued_tweet_filename, path+"posted_"+queued_tweet_filename[19:])
-				fmt.Println(rename_err)
-			}
-		}
-	} else {
-		// try to post a scheduled tweet
-		post_failure := Tweet(scheduled_content)
-		if post_failure != nil {
-			rename_err := os.Rename(scheduled_tweet_filename, path+"failed_"+scheduled_tweet_filename[9:])
-			fmt.Println(rename_err)
-		} else {
-			// fmt.Println("todo: change filename to posted_", scheduled_tweet_filename)
-			rename_err := os.Rename(scheduled_tweet_filename, path+"posted_"+scheduled_tweet_filename[9:])
-			fmt.Println(rename_err)
-		}
+		fmt.Println("Error scheduling file:", scheduled_tweet_filename)
+		fmt.Println("Error:", scheduled_tweet_error)
 	}
+	post_failure := Tweet(scheduled_content)
+	fmt.Println("Error posting to Twitter:", post_failure)
 }
