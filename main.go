@@ -85,26 +85,38 @@ func ReadFile(file_name string) (string, error) {
 func ScheduledTweet() (string, string, error) {
 	LoadDotEnv()
 	current_time := time.Now()
-	formatted_time := current_time.Format("2006-Jan-02")
 	path := os.Getenv("FILE_PATH")
 	fmt.Println(path)
 
-	todays_file_name := path + formatted_time + ".md"
-	content, err := ReadFile(todays_file_name)
-	// Fixes issue #3: Allow different date format
-	formatted_time2 := current_time.Format("January 2, 2006")
-	todays_file_name2 := path + formatted_time2 + ".md"
-	content2, err2 := ReadFile(todays_file_name2)
+	iso_date := current_time.Format("2006-Jan-02")
+	full_date := current_time.Format("January 2, 2006")
 
-	if err == nil {
-		fmt.Println("Attempting to post content from: ", todays_file_name)
-		return content, todays_file_name, nil
-	} else if err2 == nil {
-		fmt.Println("Attempting to post content from: ", todays_file_name2)
-		return content2, todays_file_name2, nil
+	possible_files := []string{
+		path + iso_date + ".md",
+		path + iso_date + ".txt",
+		path + full_date + ".md",
+		path + full_date + ".txt",
+	}
+	existing_files := []string{}
+
+	for _, file := range possible_files {
+		if _, err := os.Stat(file) ; os.IsNotExist(err) {
+			continue
+		}
+		existing_files = append(existing_files, file)
 	}
 
-	return "", "", errors.New(err.Error() + err2.Error())
+	if len(existing_files) == 0 {
+		return "", "", errors.New("No tweet files found")
+	}
+
+	content, err := ReadFile(existing_files[0])
+	if err == nil {
+		fmt.Println("Attempting to post content from: ", existing_files[0])
+		return content, existing_files[0], nil
+	}
+
+	return "", "", errors.New(err.Error())
 }
 
 // TODO: either fix or remove queue system:
