@@ -2,141 +2,186 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"time"
 
-	"github.com/coreos/pkg/flagutil"
 	"github.com/dghubble/go-twitter/twitter"
 	"github.com/dghubble/oauth1"
 	"github.com/joho/godotenv"
 )
 
-func LoadDotEnv() {
-	err := godotenv.Load()
-	if err != nil && !os.IsNotExist(err) {
-		log.Fatal("Error loading .env file")
-	}
+var (
+	ErrNoFiles        = errors.New("no tweet files found")
+	ErrBadCredentials = errors.New("bad credentials")
+)
+
+type Configuration struct {
+	APIKey            string
+	APISecret         string
+	AccessToken       string
+	AccessTokenSecret string
+	FilePath          string
 }
 
-func Tweet(content string) error {
-	LoadDotEnv()
-
-	flags := flag.NewFlagSet("user-auth", flag.ExitOnError)
-	consumerKey := flags.String("consumer-key", os.Getenv("API_KEY"), "Twitter Consumer Key")
-	consumerSecret := flags.String("consumer-secret", os.Getenv("API_SECRET_KEY"), "Twitter Consumer Secret")
-	accessToken := flags.String("access-token", os.Getenv("ACCESS_TOKEN"), "Twitter Access Token")
-	accessSecret := flags.String("access-secret", os.Getenv("ACCESS_TOKEN_SECRET"), "Twitter Access Secret")
-	flags.Parse(os.Args[1:])
-	flagutil.SetFlagsFromEnv(flags, "TWITTER")
-
-	if *consumerKey == "" || *consumerSecret == "" || *accessToken == "" || *accessSecret == "" {
-		// log.Fatal("Consumer key/secret and Access token/secret required")
-		return errors.New("Bad credentials")
-	}
-
-	config := oauth1.NewConfig(*consumerKey, *consumerSecret)
-	token := oauth1.NewToken(*accessToken, *accessSecret)
-	// OAuth1 http.Client will automatically authorize Requests
-	httpClient := config.Client(oauth1.NoContext, token)
-
-	// Twitter client
-	client := twitter.NewClient(httpClient)
-
-	// Verify Credentials
-	verifyParams := &twitter.AccountVerifyParams{
-		SkipStatus:   twitter.Bool(true),
-		IncludeEmail: twitter.Bool(true),
-	}
-	user, _, err1 := client.Accounts.VerifyCredentials(verifyParams)
-	fmt.Printf("User's ACCOUNT:\n%+v\n", user)
-	if err1 != nil {
-		return err1
-	}
-
-	tweet, _, err2 := client.Statuses.Update(content, nil)
-	fmt.Printf("Posted Tweet\n%v\n", tweet)
-	return err2
-}
-
-func ReadFile(file_name string) (string, error) {
-	file, err := os.Open(file_name)
+func main() {
+	config, err := LoadConfiguration()
 	if err != nil {
-		// log.Fatal(err)
-		return "", err
+		log.Fatal(err)
 	}
-	defer func() {
-		if err = file.Close(); err != nil {
-			log.Fatal(err)
+
+	content, err := config.ReadScheduledTweet()
+	if err != nil {
+		if errors.Is(err, ErrNoFiles) {
+			log.Println("No files to tweet. Sleep.")
+			os.Exit(0)
 		}
-	}()
+
+		log.Fatal(err)
+	}
+
+	if err := config.PostTweet(content); err != nil {
+		log.Fatalf("Error posting to Twitter: %v", err)
+	}
+}
+
+func LoadConfiguration() (*Configuration, error) {
+	if err := godotenv.Load(); err != nil || !os.IsNotExist(err) {
+		return nil, fmt.Errorf("error loading .env file %w", err)
+	}
+
+	config := Configuration{
+		APIKey:            os.Getenv("API_KEY"),
+		APISecret:         os.Getenv("API_SECRET_KEY"),
+		AccessToken:       os.Getenv("ACCESS_TOKEN"),
+		AccessTokenSecret: os.Getenv("ACCESS_TOKEN_SECRET"),
+		FilePath:          os.Getenv("FILE_PATH"),
+	}
+
+	if config.APIKey == "" {
+		return nil, fmt.Errorf("%w: twitter consumer key is empty", ErrBadCredentials)
+	}
+
+	if config.APISecret == "" {
+		return nil, fmt.Errorf("%w: twitter consumer secret is empty", ErrBadCredentials)
+	}
+
+	if config.AccessToken == "" {
+		return nil, fmt.Errorf("%w: twitter access token is empty", ErrBadCredentials)
+	}
+
+	if config.AccessTokenSecret == "" {
+		return nil, fmt.Errorf("%w: twitter access token secret is empty", ErrBadCredentials)
+	}
+
+	if config.FilePath == "" {
+		return nil, fmt.Errorf("%w: file path is empty", ErrNoFiles)
+	}
+
+	return &config, nil
+}
+
+func (c *Configuration) ReadScheduledTweet() (string, error) {
+	var (
+		currentTime   = time.Now()
+		path          = c.FilePath
+		isoDate       = currentTime.Format("2006-Jan-02")
+		fullDate      = currentTime.Format("January 2, 2006")
+		possibleFiles = []string{
+			fmt.Sprintf("%s%s.md", path, isoDate),
+			fmt.Sprintf("%s%s.txt", path, isoDate),
+			fmt.Sprintf("%s%s.md", path, fullDate),
+			fmt.Sprintf("%s%s.txt", path, fullDate),
+		}
+		existingFiles = make([]string, 0, 1)
+	)
+
+	log.Println("File path: ", path)
+
+	for _, file := range possibleFiles {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			continue
+		}
+
+		existingFiles = append(existingFiles, file)
+	}
+
+	if len(existingFiles) == 0 {
+		return "", ErrNoFiles
+	}
+
+	firstFilepath := existingFiles[0]
+
+	content, err := ReadFile(firstFilepath)
+	if err != nil {
+		return "", fmt.Errorf("reading from %s: %w", firstFilepath, err)
+	}
+
+	log.Println("Attempting to post content from: ", firstFilepath)
+
+	return content, nil
+}
+
+func ReadFile(filename string) (string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return "", fmt.Errorf("open %s: %w", filename, err)
+	}
+	defer file.Close()
 
 	b, _ := ioutil.ReadAll(file)
+
 	return string(b), nil
 }
 
-// TODO: this is hard to test, should be refactored
-// GetFilenameFromDate(date) string
-// ReadTodaysFilename(string) string
-func ScheduledTweet() (string, string, error) {
-	LoadDotEnv()
-	current_time := time.Now()
-	path := os.Getenv("FILE_PATH")
-	fmt.Println(path)
+func (c *Configuration) PostTweet(content string) error {
+	var (
+		config = oauth1.NewConfig(c.APIKey, c.APISecret)
+		token  = oauth1.NewToken(c.AccessToken, c.AccessTokenSecret)
 
-	iso_date := current_time.Format("2006-Jan-02")
-	full_date := current_time.Format("January 2, 2006")
+		// OAuth1 http.Client will automatically authorize Requests
+		httpClient = config.Client(oauth1.NoContext, token)
 
-	possible_files := []string{
-		path + iso_date + ".md",
-		path + iso_date + ".txt",
-		path + full_date + ".md",
-		path + full_date + ".txt",
-	}
-	existing_files := []string{}
+		// Twitter client
+		client = twitter.NewClient(httpClient)
 
-	for _, file := range possible_files {
-		if _, err := os.Stat(file) ; os.IsNotExist(err) {
-			continue
+		// Verify Credentials
+		verifyParams = &twitter.AccountVerifyParams{
+			SkipStatus:   twitter.Bool(true),
+			IncludeEmail: twitter.Bool(true),
 		}
-		existing_files = append(existing_files, file)
+	)
+
+	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+	if err != nil {
+		return fmt.Errorf("verify credentials: %w", err)
 	}
 
-	if len(existing_files) == 0 {
-		return "", "", errors.New("No tweet files found")
+	if _, _, err := client.Statuses.Update(content, nil); err != nil {
+		return fmt.Errorf("post tweet: %w", err)
 	}
 
-	content, err := ReadFile(existing_files[0])
-	if err == nil {
-		fmt.Println("Attempting to post content from: ", existing_files[0])
-		return content, existing_files[0], nil
-	}
-
-	return "", "", errors.New(err.Error())
+	return nil
 }
 
-// TODO: either fix or remove queue system:
+// TODO: either fix or remove queue system.
 func IsQueueNameFormat(filename string) bool {
 	// if name fits the format q-#, return true
-	if string(filename[0]) == "q" && string(filename[1]) == "-" {
-		return true
-	}
-	return false
+	return strings.HasPrefix(filename, "q-")
 }
 
-// TODO: either fix or remove queue system:
-func QueuedTweet() (string, string, error) {
-	LoadDotEnv()
-	path := os.Getenv("FILE_PATH")
-	files, dir_read_error := ioutil.ReadDir(path)
-	if dir_read_error != nil {
-		return "", "", dir_read_error
+// TODO: either fix or remove queue system.
+func (c *Configuration) QueuedTweet() (string, error) {
+	files, err := ioutil.ReadDir(c.FilePath)
+	if err != nil {
+		return "", fmt.Errorf("read dir %s: %w", c.FilePath, err)
 	}
-	filenames := []string{}
+
+	var filenames []string
 
 	for _, f := range files {
 		if IsQueueNameFormat(f.Name()) {
@@ -145,36 +190,30 @@ func QueuedTweet() (string, string, error) {
 	}
 
 	sort.Strings(filenames)
+
 	if len(filenames) == 0 {
-		return "", "", errors.New("No queued files found")
-	}
-	queued_file_name := filenames[0]
-
-	queued_file_path := path + queued_file_name
-
-	content, read_error := ReadFile(queued_file_path)
-	if read_error != nil {
-		return "", "", read_error
+		return "", ErrNoFiles
 	}
 
-	current_time := time.Now()
-	formatted_time := current_time.Format("2006-Jan-02")
-	new_filename_path := path + "attempted_" + formatted_time + "_" + queued_file_name
-	rename_error := os.Rename(queued_file_path, new_filename_path)
-	if rename_error != nil {
-		return "", "", rename_error
+	var (
+		queuedFilename = filenames[0]
+		queuedFilepath = fmt.Sprintf("%s%s", c.FilePath, queuedFilename)
+	)
+
+	content, err := ReadFile(queuedFilepath)
+	if err != nil {
+		return "", fmt.Errorf("read file %s: %w", queuedFilepath, err)
 	}
 
-	// return the content of the file
-	return content, new_filename_path, nil
-}
+	var (
+		currentTime     = time.Now()
+		formattedTime   = currentTime.Format("2006-Jan-02")
+		newFilenamePath = fmt.Sprintf("%sattempted_%s_%s", c.FilePath, formattedTime, queuedFilename)
+	)
 
-func main() {
-	scheduled_content, scheduled_tweet_filename, scheduled_tweet_error := ScheduledTweet()
-	if scheduled_tweet_error != nil {
-		fmt.Println("Error scheduling file:", scheduled_tweet_filename)
-		fmt.Println("Error:", scheduled_tweet_error)
+	if err := os.Rename(queuedFilepath, newFilenamePath); err != nil {
+		return "", fmt.Errorf("rename from %s to %s: %w", queuedFilepath, newFilenamePath, err)
 	}
-	post_failure := Tweet(scheduled_content)
-	fmt.Println("Error posting to Twitter:", post_failure)
+
+	return content, nil
 }
