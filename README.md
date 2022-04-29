@@ -1,6 +1,8 @@
 # markdown-tweet-scheduler
 Schedule tweets from markdown files in your repo, posted to twitter via github actions. 
 
+Now supports .txt as well as .md files!
+
 
 ## Why
 - View, edit, and post your tweets without logging into twitter 
