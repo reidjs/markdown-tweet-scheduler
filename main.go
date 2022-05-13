@@ -7,8 +7,11 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"sort"
 	"time"
+
+	"main.go/pkg"
 
 	"github.com/coreos/pkg/flagutil"
 	"github.com/dghubble/go-twitter/twitter"
@@ -82,41 +85,43 @@ func ReadFile(file_name string) (string, error) {
 // TODO: this is hard to test, should be refactored
 // GetFilenameFromDate(date) string
 // ReadTodaysFilename(string) string
-func ScheduledTweet() (string, string, error) {
+func ScheduledTweet() (scheduled []pkg.FileContent, err error) {
 	LoadDotEnv()
-	current_time := time.Now()
 	path := os.Getenv("FILE_PATH")
 	fmt.Println(path)
 
-	iso_date := current_time.Format("2006-Jan-02")
-	full_date := current_time.Format("January 2, 2006")
-
-	possible_files := []string{
-		path + iso_date + ".md",
-		path + iso_date + ".txt",
-		path + full_date + ".md",
-		path + full_date + ".txt",
+	filesInDirectory, err := ioutil.ReadDir(path)
+	if err != nil {
+		return nil, err
 	}
-	existing_files := []string{}
 
-	for _, file := range possible_files {
-		if _, err := os.Stat(file) ; os.IsNotExist(err) {
+	dateRegex, err := regexp.Compile(`(\d{4}-\w{3}-\d{2}|\w+ \d{2}, \d{4})\.(md|txt)`)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, fileInfo := range filesInDirectory {
+		if fileInfo.IsDir() {
 			continue
 		}
-		existing_files = append(existing_files, file)
+
+		if dateRegex.MatchString(fileInfo.Name()) {
+			if result := pkg.ReadFileComplex(path, fileInfo.Name(), true); result != nil {
+				scheduled = append(scheduled, *result)
+			}
+			continue
+		}
+
+		if result := pkg.ReadFileComplex(path, fileInfo.Name(), false); result != nil {
+			scheduled = append(scheduled, *result)
+		}
 	}
 
-	if len(existing_files) == 0 {
-		return "", "", errors.New("No tweet files found")
+	if len(scheduled) == 0 {
+		return nil, errors.New("no tweet files found")
 	}
 
-	content, err := ReadFile(existing_files[0])
-	if err == nil {
-		fmt.Println("Attempting to post content from: ", existing_files[0])
-		return content, existing_files[0], nil
-	}
-
-	return "", "", errors.New(err.Error())
+	return scheduled, nil
 }
 
 // TODO: either fix or remove queue system:
@@ -170,11 +175,16 @@ func QueuedTweet() (string, string, error) {
 }
 
 func main() {
-	scheduled_content, scheduled_tweet_filename, scheduled_tweet_error := ScheduledTweet()
+	scheduled_list, scheduled_tweet_error := ScheduledTweet()
 	if scheduled_tweet_error != nil {
-		fmt.Println("Error scheduling file:", scheduled_tweet_filename)
+		fmt.Println("Error scheduling files:", scheduled_list)
 		fmt.Println("Error:", scheduled_tweet_error)
+		return
 	}
-	post_failure := Tweet(scheduled_content)
-	fmt.Println("Error posting to Twitter:", post_failure)
+	fmt.Println(pkg.SprintFileList(scheduled_list))
+
+	for _, scheduled := range scheduled_list {
+		post_failure := Tweet(scheduled.Content)
+		fmt.Println("Error posting to Twitter:", post_failure)
+	}
 }
