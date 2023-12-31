@@ -1,3 +1,5 @@
+⚠️ This may not work anymore given the recent Twitter (X) API changes, sorry! 
+
 # markdown-tweet-scheduler
 Schedule tweets from markdown files in your repo, posted to twitter via github actions. 
 
